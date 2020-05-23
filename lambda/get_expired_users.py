@@ -28,7 +28,9 @@ def get_expired_keys(event, context):
             metadata = client.list_access_keys(UserName=username)
             if metadata["AccessKeyMetadata"]:
                 for key in metadata["AccessKeyMetadata"]:
-                    if key["Status"] == "Active" and (_time_diff(key["CreateDate"]) >= event["KeyAge"]):
+                    if key["Status"] == "Active" and (
+                        _time_diff(key["CreateDate"]) >= event["KeyAge"]
+                    ):
                         expired_keys.append(
                             {
                                 "UserName": username,
