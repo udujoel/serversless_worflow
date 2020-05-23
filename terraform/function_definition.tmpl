@@ -19,6 +19,20 @@
                             "End": true
                         }
                     }
+                },
+                {
+                    "StartAt": "GetServiceAccountsKey",
+                    "States": {
+                        "GetServiceAccountsKey": {
+                            "Type": "Task",
+                            "Resource": "${get_epired_keys}",
+                            "Parameters": {
+                                "UserPath": "/service-accounts/",
+                                "KeyAge": 1
+                            },
+                            "End": true
+                        }
+                    }
                 }
             ]
         }
