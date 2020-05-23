@@ -1,0 +1,26 @@
+{
+    "Comment": "Access keys rotation workflow",
+    "StartAt": "Get Expired Keys",
+    "States": {
+        "Get Expired Keys": {
+            "Type": "Parallel",
+            "End": true,
+            "Branches": [
+                {
+                    "StartAt": "GetEmployeeKeys",
+                    "States": {
+                        "GetEmployeeKeys": {
+                            "Type": "Task",
+                            "Resource": "${get_epired_keys}",
+                            "Parameters": {
+                                "UserPath": "/employees/",
+                                "KeyAge": 1
+                            },
+                            "End": true
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}
