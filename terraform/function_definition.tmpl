@@ -11,9 +11,49 @@
                     "States": {
                         "GetEmployeeKeys": {
                             "Type": "Task",
-                            "Resource": "${get_epired_keys}",
+                            "Resource": "${get_expired_users}",
                             "Parameters": {
                                 "UserPath": "/employees/",
+                                "KeyAge": 1
+                            },
+                            "Next": "ProccessEmployeeKeys"
+                        },
+                        "ProccessEmployeeKeys": {
+                            "Type": "Map",
+                            "ItemsPath": "$.Users",
+                            "MaxConcurrency": 0,
+                            "Iterator": {
+                                "StartAt": "DisableEmployeeKeys",
+                                "States": {
+                                    "DisableEmployeeKeys": {
+                                        "Type": "Task",
+                                        "Resource": "${process_expired_keys}",
+                                        "Retry": [
+                                            {
+                                                "ErrorEquals": [
+                                                    "TimeOut"
+                                                ],
+                                                "IntervalSeconds": 1,
+                                                "BackoffRate": 2,
+                                                "MaxAttempts": 3
+                                            }
+                                        ],
+                                        "End": true
+                                    }
+                                }
+                            },
+                            "End": true
+                        }
+                    }
+                },
+                {
+                    "StartAt": "GetServiceAccountsKey",
+                    "States": {
+                        "GetServiceAccountsKey": {
+                            "Type": "Task",
+                            "Resource": "${get_expired_users}",
+                            "Parameters": {
+                                "UserPath": "/service-accounts/",
                                 "KeyAge": 1
                             },
                             "End": true

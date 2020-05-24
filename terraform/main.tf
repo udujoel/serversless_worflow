@@ -12,6 +12,7 @@ terraform {
   }
 }
 
+# Lambda GetExpiredKeys
 data "archive_file" "get_expired_keys_archive" {
   type        = "zip"
   source_file = "../lambda/get_expired_users.py"
@@ -66,8 +67,8 @@ resource "aws_iam_policy" "get_expired_users_policy" {
         {
             "Action": [
                 "logs:CreateLogGroup",
-                "logs:CreateLogSteam",
-                "logs:PutLogsEvent"
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
             ],
             "Resource": "arn:aws:logs:*:*:*",
             "Effect": "Allow"
@@ -89,6 +90,85 @@ resource "aws_iam_policy" "get_expired_users_policy" {
 resource "aws_iam_role_policy_attachment" "get_expired_users_attach" {
   role       = aws_iam_role.get_expired_users_role.name
   policy_arn = aws_iam_policy.get_expired_users_policy.arn
+}
+
+# Lambda PoceedExpiredKeys
+data "archive_file" "process_expired_keys_archive" {
+  type        = "zip"
+  source_file = "../lambda/process_expired_keys.py"
+  output_path = "../lambda/process_expired_keys.zip"
+}
+
+resource "aws_lambda_function" "process_expired_keys_lambda" {
+  filename         = "../lambda/process_expired_keys.zip"
+  function_name    = "PoceedExpiredKeys"
+  role             = aws_iam_role.process_expired_keys_role.arn
+  handler          = "process_expired_keys.lambda_handler"
+  timeout          = 120
+  source_code_hash = data.archive_file.process_expired_keys_archive.output_base64sha256
+
+  runtime = "python3.8"
+}
+
+resource "aws_cloudwatch_log_group" "process_expired_keys_log_group" {
+  name              = "/aws/lambda/PoceedExpiredKeys"
+  retention_in_days = 1
+}
+
+resource "aws_iam_role" "process_expired_keys_role" {
+  name = "Lambda-PoceedExpiredKeys"
+
+  assume_role_policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": "sts:AssumeRole",
+            "Principal": {
+                "Service": "lambda.amazonaws.com"
+            },
+            "Effect": "Allow",
+            "Sid": "131232"
+        }
+    ]
+}
+  EOF
+}
+
+resource "aws_iam_policy" "process_expired_keys_policy" {
+  name        = "PoceedExpiredKeys"
+  path        = "/"
+  description = "Iam policy for lambda PoceedExpiredKeys"
+
+  policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:*:*:*",
+            "Effect": "Allow"
+        },
+        {
+            "Action": [
+                "iam:ListUserTags",
+                "iam:UpdateAccessKey"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        }
+    ]
+}
+  EOF
+}
+
+resource "aws_iam_role_policy_attachment" "process_expired_keys_attach" {
+  role       = aws_iam_role.process_expired_keys_role.name
+  policy_arn = aws_iam_policy.process_expired_keys_policy.arn
 }
 
 # Step function
@@ -127,7 +207,8 @@ resource "aws_iam_policy" "step_function_policy" {
                 "lambda:InvokeFunction"
             ],
             "Resource": [
-                "${aws_lambda_function.get_expired_users_lambda.arn}"
+                "${aws_lambda_function.get_expired_users_lambda.arn}",
+                "${aws_lambda_function.process_expired_keys_lambda.arn}"
             ]
         }
     ]
@@ -145,6 +226,7 @@ resource "aws_sfn_state_machine" "state_machine" {
   role_arn = aws_iam_role.iam_for_sfn.arn
 
   definition = templatefile("./function_definition.tmpl", {
-    get_epired_keys = aws_lambda_function.get_expired_users_lambda.arn
+    get_expired_users = aws_lambda_function.get_expired_users_lambda.arn
+    process_expired_keys = aws_lambda_function.process_expired_keys_lambda.arn
   })
 }
