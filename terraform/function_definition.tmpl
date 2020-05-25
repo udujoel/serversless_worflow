@@ -56,11 +56,57 @@
                                 "UserPath": "/service-accounts/",
                                 "KeyAge": 1
                             },
+                            "Next": "ProccessServiceOwnerKeys"
+                        },
+                        "ProccessServiceOwnerKeys": {
+                            "Type": "Map",
+                            "ItemsPath": "$.Users",
+                            "MaxConcurrency": 0,
+                            "Iterator": {
+                                "StartAt": "NotifyServiceOwner",
+                                "States": {
+                                    "NotifyServiceOwner": {
+                                        "Type": "Task",
+                                        "Resource": "${notify_service_user_owner}",
+                                        "Retry": [
+                                            {
+                                                "ErrorEquals": [
+                                                    "TimeOut"
+                                                ],
+                                                "IntervalSeconds": 1,
+                                                "BackoffRate": 2,
+                                                "MaxAttempts": 3
+                                            }
+                                        ],
+                                        "End": true
+                                    }
+                                }
+                            },
                             "End": true
                         }
                     }
                 }
+            ],
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "ResultPath": "$.GetKeyError",
+                    "Next": "SendError"
+                }
             ]
+        },
+        "SendError": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::sns:publish",
+            "Parameters": {
+                "TopicArn": "${admin_sns_topic}",
+                "Message": {
+                    "KeyRotationError.$": "$.GetKeyError"
+                }
+            },
+            "End": true
         }
     }
 }
