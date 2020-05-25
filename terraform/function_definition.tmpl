@@ -99,7 +99,7 @@
         },
         "SendError": {
             "Type": "Task",
-            "Resources": "arn:aws:states:::sns:publish",
+            "Resource": "arn:aws:states:::sns:publish",
             "Parameters": {
                 "TopicArn": "${admin_sns_topic}",
                 "Message": "$.GetKeyError"
