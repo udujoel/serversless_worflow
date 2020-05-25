@@ -24,6 +24,10 @@ def get_expired_keys(event, context):
     expired_keys = []
 
     for username, path in get_iam_accounts().items():
+        email = ""
+        for tag in client.list_user_tags(UserName=username)["Tags"]:
+            if tag["Key"] == "email":
+                email = tag["Value"]
         if path == event["UserPath"]:
             metadata = client.list_access_keys(UserName=username)
             if metadata["AccessKeyMetadata"]:
@@ -37,6 +41,7 @@ def get_expired_keys(event, context):
                                 "AccessKey": key["AccessKeyId"],
                                 "KeyAge": _time_diff(key["CreateDate"]),
                                 "UserPath": path,
+                                "Email": email
                             }
                         )
     result["Users"] = expired_keys

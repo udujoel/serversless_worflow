@@ -13,7 +13,7 @@ terraform {
 }
 
 # General resource
-resource "aws_sns_topic" "admin_sns_topic" { 
+resource "aws_sns_topic" "admin_sns_topic" {
   name = "admin_notification"
 }
 
@@ -82,7 +82,8 @@ resource "aws_iam_policy" "get_expired_users_policy" {
             "Action": [
                 "iam:ListUsers",
                 "iam:GetUser",
-                "iam:ListAccessKeys"
+                "iam:ListAccessKeys",
+                "iam:ListUserTags"
             ],
             "Resource": "*",
             "Effect": "Allow"
@@ -160,7 +161,6 @@ resource "aws_iam_policy" "process_expired_keys_policy" {
         },
         {
             "Action": [
-                "iam:ListUserTags",
                 "iam:UpdateAccessKey"
             ],
             "Resource": "*",
@@ -229,13 +229,25 @@ resource "aws_iam_policy" "notify_service_user_owner_policy" {
     "Version": "2012-10-17",
     "Statement": [
         {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
             "Action": [
-                "logs:CreateLogGroup",
                 "logs:CreateLogStream",
                 "logs:PutLogEvents"
             ],
-            "Resource": "arn:aws:logs:*:*:*",
-            "Effect": "Allow"
+            "Resource": "arn:aws:logs:*:*:*"
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": "ssm:*",
+            "Resource": "*"
+        },
+        {
+            "Sid": "VisualEditor2",
+            "Effect": "Allow",
+            "Action": "logs:CreateLogGroup",
+            "Resource": "arn:aws:logs:*:*:*"
         }
     ]
 }
@@ -287,14 +299,21 @@ resource "aws_iam_policy" "step_function_policy" {
                 "${aws_lambda_function.process_expired_keys_lambda.arn}",
                 "${aws_lambda_function.notify_service_user_owner_lambda.arn}"
             ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "sns:Publish"
+            ],
+            "Resource": "${aws_sns_topic.admin_sns_topic.arn}"
         }
     ]
 }
   EOF
 }
 
-resource "aws_iam_role_policy_attachment" "step_function_attachment" { 
-  role = aws_iam_role.iam_for_sfn.name
+resource "aws_iam_role_policy_attachment" "step_function_attachment" {
+  role       = aws_iam_role.iam_for_sfn.name
   policy_arn = aws_iam_policy.step_function_policy.arn
 }
 
@@ -303,9 +322,65 @@ resource "aws_sfn_state_machine" "state_machine" {
   role_arn = aws_iam_role.iam_for_sfn.arn
 
   definition = templatefile("./function_definition.tmpl", {
-    get_expired_users = aws_lambda_function.get_expired_users_lambda.arn
-    process_expired_keys = aws_lambda_function.process_expired_keys_lambda.arn
+    get_expired_users         = aws_lambda_function.get_expired_users_lambda.arn
+    process_expired_keys      = aws_lambda_function.process_expired_keys_lambda.arn
     notify_service_user_owner = aws_lambda_function.notify_service_user_owner_lambda.arn
-    admin_sns_topic = aws_sns_topic.admin_sns_topic.arn
+    admin_sns_topic           = aws_sns_topic.admin_sns_topic.arn
   })
+}
+
+resource "aws_cloudwatch_event_rule" "KeysRotationDaily" {
+  name        = "KeysRotationDaily"
+  description = "Execute KeysRotationD step function daily"
+
+  schedule_expression = "rate(1 day)"
+}
+
+resource "aws_cloudwatch_event_target" "KeysRotationDailyTarget" {
+  rule     = aws_cloudwatch_event_rule.KeysRotationDaily.name
+  arn      = aws_sfn_state_machine.state_machine.id
+  role_arn = aws_iam_role.cwe_role.arn
+}
+
+resource "aws_iam_role" "cwe_role" {
+  name = "CWE-KeysRotation"
+
+  assume_role_policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": "sts:AssumeRole",
+            "Principal": {
+                "Service": "events.amazonaws.com"
+            },
+            "Effect": "Allow",
+            "Sid": "131232"
+        }
+    ]
+}
+  EOF
+}
+
+resource "aws_iam_policy" "cwe_policy" {
+  name        = "CWE-KeysRotationPolicy"
+  path        = "/"
+  description = "Iam policy for lambda PoceedExpiredKeys"
+
+  policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "states:StartExecution"
+            ],
+            "Resource": [
+                "${aws_sfn_state_machine.state_machine.id}"
+            ]
+        }
+    ]
+}
+  EOF
 }
