@@ -12,6 +12,11 @@ terraform {
   }
 }
 
+# General resource
+resource "aws_sns_topic" "admin_sns_topic" { 
+  name = "admin_notification"
+}
+
 # Lambda GetExpiredKeys
 data "archive_file" "get_expired_keys_archive" {
   type        = "zip"
@@ -279,7 +284,8 @@ resource "aws_iam_policy" "step_function_policy" {
             ],
             "Resource": [
                 "${aws_lambda_function.get_expired_users_lambda.arn}",
-                "${aws_lambda_function.process_expired_keys_lambda.arn}"
+                "${aws_lambda_function.process_expired_keys_lambda.arn}",
+                "${aws_lambda_function.notify_service_user_owner_lambda.arn}"
             ]
         }
     ]
@@ -300,5 +306,6 @@ resource "aws_sfn_state_machine" "state_machine" {
     get_expired_users = aws_lambda_function.get_expired_users_lambda.arn
     process_expired_keys = aws_lambda_function.process_expired_keys_lambda.arn
     notify_service_user_owner = aws_lambda_function.notify_service_user_owner_lambda.arn
+    admin_sns_topic = aws_sns_topic.admin_sns_topic.arn
   })
 }
