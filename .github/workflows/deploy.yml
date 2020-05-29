@@ -28,7 +28,7 @@ jobs:
 
       - name: Run linter
         run: |
-          flak8 lambda
+          flake8 lambda
           
       - name: Install terraform
         uses: hashicorp/setup-terraform@v1
