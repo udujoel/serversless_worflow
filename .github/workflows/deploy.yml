@@ -34,29 +34,24 @@ jobs:
         uses: hashicorp/setup-terraform@v1
 
       - name: Terraform fmt
-        id: fmt
         run: terraform fmt
         continue-on-error: true
         working-directory: ./terraform
 
       - name: Terraform Init
-        id: init
         run: terraform init
         working-directory: ./terraform
 
       - name: Terraform Validate
-        id: validate
         run: terraform validate -no-color
         working-directory: ./terraform
 
       - name: Terraform Plan
-        id: plan
         run: terraform plan -no-color
         continue-on-error: true
         working-directory: ./terraform
 
-      - name: Terraform Plan
-        id: plan
+      - name: Terraform Apply
         run: terraform apply -no-color -auto-approve
         continue-on-error: true
         working-directory: ./terraform
